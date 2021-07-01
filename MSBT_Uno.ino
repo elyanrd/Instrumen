@@ -5,6 +5,7 @@
 #include <SD.h>
 #include <SPI.h>
 #include <dht.h>
+#include <ArduinoJson.h>
 
 //masukin pin input sama declare variable
 //sensor arus
@@ -12,8 +13,8 @@ const int arus = A4 ;
 int nilai = 0;
 //int sense = 30; //20
 //int offset = 2500;
-double adcvol = 0;
-double current = 0;
+float adcvol = 0;
+float current = 0;
 
 //sensor tegangan
 const int voltage = A1;
@@ -29,7 +30,7 @@ dht DHT;
 float hum;
 float temp;
 
-//Library starting
+//Buat object dari classes (OOP)
 TinyGPSPlus gps;
 DS3231 rtc(SDA, SCL); 
 File myFile;
@@ -43,7 +44,7 @@ void setup() {
 
   //bagian LCD
   lcd.init();                      // initialize the lcd 
-  
+  lcd.backlight();
   
 Serial.begin(9600);
   lcd.begin(16,4);
@@ -62,32 +63,34 @@ void loop() {
   // put your main code here, to run repeatedly:
   //arus
   nilai = analogRead(arus);
-  //adcvol = (nilai/1024.0)*5171.71;
-  //current = ((adcvol - offset)/sense);
-  current = ((0.4299*nilai)-194.72);
+  adcvol = (nilai/1023.0)*5;
+  current = adcvol - 2.5; //Nilai 2.5 ini merupakan nilai offset
+  current = adcvol * 200;
+  
   
   //voltage
   volt = analogRead(voltage);
-  vout = volt / 1023.0;
-  vin = (vout * 142.162) + 1.5 ;
+  vout = constrain(volt, 714, 1023); //range terendah 38.4
+  vout = (volt / 1023.0)*5.0;
+  vin = vout * 10.999;
+  //Coba pake fungsi constrain() sama map()
 
   int chk = DHT.read22 (2);
-  hum = DHT.humidity;
   temp= DHT.temperature;
-  { while(Serial.available())
-  {gps.encode(Serial.read());}
-  (gps.location.isUpdated());
- }
+
+ while(Serial.available())
+  {
+    gps.encode(Serial.read());
+  }
+
  if (SD.begin())
-  {lcd.setCursor(10,0); 
-   lcd.print("OK"); } 
-  else
-  {lcd.setCursor(10,0); 
-   lcd.print("GK");}
-  { 
+  {
+    lcd.setCursor(10,0); 
+    lcd.print("OK"); 
+  } 
     if ((unsigned long)(millis() - previousMillis) >= 1000){
-  myFile = SD.open("coba1.txt", FILE_WRITE);
-  if (myFile) {
+        myFile = SD.open("coba2.txt", FILE_WRITE);
+    if (myFile) {
     myFile.print(F("Date: "));    
     myFile.print(rtc.getDateStr());
     myFile.print(F(" , ")); 
@@ -95,7 +98,7 @@ void loop() {
     myFile.print(rtc.getTimeStr());
     myFile.print(F(" , ")); 
     myFile.print(F("MPH: "));     
-    myFile.print(gps.speed.mph());
+    myFile.print(gps.speed.kmph());
     myFile.print(F(" , "));
     myFile.print(F("Latitude: "));
     myFile.print(gps.location.lat(), 10);
@@ -120,9 +123,15 @@ void loop() {
     myFile.print(F(" , "));
     myFile.print(F("Power: "));
     myFile.print(F(" , "));
-    myFile.println(vin*current);
+    myFile.print(vin*current);
+    myFile.print(F(" , "));
+    myFile.print(F("Raw Current: "));
+    myFile.println(nilai);
     myFile.close();  
   }
+  else {
+    lcd.setCursor(10,0); 
+    lcd.print("ER");
 }
 }
   //line 1
@@ -161,4 +170,7 @@ void loop() {
   lcd.print("C");
   lcd.setCursor(9,3);
   lcd.print((char)223);
+
+  //buatJson(vin, current, temp);
 }
+
